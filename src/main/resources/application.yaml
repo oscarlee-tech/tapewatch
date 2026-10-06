@@ -1,0 +1,11 @@
+spring:
+  application:
+    name: tapewatch
+  config:
+    import: optional:file:.env[.properties]
+
+recorder:
+  toss-invest:
+    base-url: https://openapi.tossinvest.com
+    client-id: ${TOSS_CLIENT_ID:}
+    client-secret: ${TOSS_CLIENT_SECRET:}

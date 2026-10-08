@@ -16,8 +16,8 @@ public record RankingsResponse(Result result) {
             String symbol,
             String currency,
             Price price,
-            long tradingVolume,
-            long tradingAmount) {}
+            BigDecimal tradingVolume,
+            BigDecimal tradingAmount) {}
 
     public record Price(
             BigDecimal lastPrice,

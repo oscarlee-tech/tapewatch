@@ -9,3 +9,7 @@ recorder:
     base-url: https://openapi.tossinvest.com
     client-id: ${TOSS_CLIENT_ID:}
     client-secret: ${TOSS_CLIENT_SECRET:}
+  universe:
+    ranking-count: 100        # rankings to fetch per side
+    max-per-side: 45          # 45 stocks x 2 channels = 90 topics per connection (limit 100)
+    min-abs-change-rate: 0.10 # 0.10 = 10%

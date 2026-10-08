@@ -117,7 +117,7 @@ Two separate models: 🚀 one for **top gainers** (does the run keep going?) and
 - [x] 🔁 Retry on `429 Too Many Requests` (backoff + jitter)
 - [x] ⏰ Pre-market scheduler at 08:30 KST
 - [x] 🧪 Integration tests against the **real** Toss API
-- [ ] 🎯 Pick today's movers (filters + "sticky" re-picking)
+- [x] 🎯 Pick today's movers (±10%, add-only, up to 45 per side)
 - [ ] 📡 WebSocket recorder for trades + order book
 - [ ] 🧮 Row builder + labels
 - [ ] 🌲 LightGBM training

@@ -86,7 +86,7 @@ public class TossClient {
         log.info("Toss access token issued: expiresIn={}s, expiresAt={}", response.expiresIn(), expiresAt);
     }
 
-    private String requireAccessToken() {
+    public String requireAccessToken() {
         TokenState current = token;
         if (current == null) {
             throw new IllegalStateException("No access token available - call issueAccessToken() first");

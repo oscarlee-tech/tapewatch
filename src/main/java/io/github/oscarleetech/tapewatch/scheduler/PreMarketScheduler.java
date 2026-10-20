@@ -8,6 +8,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
+import org.springframework.core.annotation.Order;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -52,9 +53,11 @@ public class PreMarketScheduler {
 
     /**
      * Also prepare once on startup, so a restart or a local run does not wait for 08:30 KST.
+     * Runs before RecordingScheduler.startOnStartup, which needs the token and the whitelist.
      * Tests turn this off with recorder.prepare-on-startup=false to avoid calling the real Toss API.
      */
     @EventListener(ApplicationReadyEvent.class)
+    @Order(0)
     public void prepareOnStartup() {
         if (!runOnStartup) {
             log.info("Startup preparation skipped (recorder.prepare-on-startup=false)");

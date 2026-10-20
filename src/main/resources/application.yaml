@@ -13,4 +13,3 @@ recorder:
     ranking-count: 100        # rankings to fetch per side
     max-per-side: 45          # 45 stocks x 2 channels = 90 topics per connection (limit 100)
     min-abs-change-rate: 0.10 # 0.10 = 10%
-  raw-dir: build/test-raw

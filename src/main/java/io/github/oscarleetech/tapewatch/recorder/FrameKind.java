@@ -16,7 +16,7 @@ public enum FrameKind {
     /** A stock was added to the watch list. */
     UNIVERSE,
 
-    // REST responses, each wrapped in an envelope with the request params and the HTTP status
+    // REST responses, each wrapped in an envelope with the request and the HTTP status
     REST_RANKINGS,
     REST_TRADES,
     REST_CANDLES_1M,
@@ -25,5 +25,6 @@ public enum FrameKind {
     REST_WARNINGS,
     REST_STOCKS,
     REST_STOCKS_ALL,
-    REST_MARKET_CALENDAR
+    REST_MARKET_CALENDAR,
+    REST_ORDERBOOK
 }

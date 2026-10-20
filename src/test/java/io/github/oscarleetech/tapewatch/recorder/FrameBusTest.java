@@ -1,5 +1,6 @@
 package io.github.oscarleetech.tapewatch.recorder;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.time.Instant;
@@ -14,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class FrameBusTest {
 
     @Test
+    @DisplayName("Every handler sees every frame, in the same order, with one global seq")
     void everyHandlerSeesEveryFrameInTheSameOrder() throws InterruptedException {
         List<RawFrame> writerSeen = Collections.synchronizedList(new ArrayList<>());
         List<RawFrame> pipelineSeen = Collections.synchronizedList(new ArrayList<>());
@@ -39,6 +41,7 @@ class FrameBusTest {
     }
 
     @Test
+    @DisplayName("A full ring drops frames instead of blocking the publisher")
     void fullRingDropsInsteadOfBlockingTheWebSocketThread() {
         CountDownLatch release = new CountDownLatch(1);
         FrameBus bus = new FrameBus(8, List.of((event, sequence, endOfBatch) -> release.await())); // stuck handler

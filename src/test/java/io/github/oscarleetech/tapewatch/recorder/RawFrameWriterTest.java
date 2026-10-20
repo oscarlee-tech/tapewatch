@@ -1,5 +1,6 @@
 package io.github.oscarleetech.tapewatch.recorder;
 
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
@@ -25,6 +26,7 @@ class RawFrameWriterTest {
     Path dir;
 
     @Test
+    @DisplayName("Writes a whole Korea-time day to one file, after the format header")
     void writesTheWholeDayToOneFileAfterTheFormatHeader() throws IOException {
         RawFrameWriter writer = new RawFrameWriter(dir);
         writer.onEvent(event(0, at(9, 0, 1), FrameKind.WS_GAINERS, "morning"), 0, true);
@@ -38,6 +40,7 @@ class RawFrameWriterTest {
     }
 
     @Test
+    @DisplayName("After a crash only unflushed frames are lost, and the restart opens a new file")
     void crashThenRestartLosesOnlyUnflushedFrames() throws IOException {
         RawFrameWriter crashed = new RawFrameWriter(dir);
         crashed.onEvent(event(0, at(9, 10, 0), FrameKind.WS_GAINERS, "flushed"), 0, false);
@@ -60,6 +63,7 @@ class RawFrameWriterTest {
     }
 
     @Test
+    @DisplayName("Records frames published through the FrameBus, one line per frame")
     void recordsFramesPublishedThroughTheBus() throws IOException {
         FrameBus bus = new FrameBus(1 << 10, List.of(new RawFrameWriter(dir)));
         bus.publish(FrameKind.WS_GAINERS, Instant.now(), "first");

@@ -2,6 +2,7 @@ package io.github.oscarleetech.tapewatch.recorder;
 
 import io.github.oscarleetech.tapewatch.client.TossClient;
 import org.assertj.core.api.Condition;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,6 +39,7 @@ class TossMarketStreamIntegrationTest {
     private String wsUrl;
 
     @Test
+    @DisplayName("Subscribes, gets a pong, and re-sends the same subscription after a dropped connection")
     void subscribesKeepsAliveAndResubscribesAfterADrop() {
         assumeTrue(!clientId.isBlank(), "TOSS_CLIENT_ID is not set - skipping real WebSocket test");
         tossClient.issueAccessToken();

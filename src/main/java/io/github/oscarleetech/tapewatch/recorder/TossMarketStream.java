@@ -34,7 +34,7 @@ public class TossMarketStream {
     private static final long MAX_BACKOFF_MS = 30_000;
     private static final long HEALTHY_SESSION_NANOS = 60_000_000_000L;        // lived 60s: reset the backoff
 
-    private final String name;
+    private final FrameKind kind;
     private final URI wsUrl;
     private final Duration pingInterval;
     private final TossClient tossClient;
@@ -51,9 +51,12 @@ public class TossMarketStream {
     private volatile int failedAttempts;
     private int declarationCount;
 
-    public TossMarketStream(String name, URI wsUrl, Duration pingInterval,
+    public TossMarketStream(FrameKind kind, URI wsUrl, Duration pingInterval,
                             TossClient tossClient, FrameBus frameBus) {
-        this.name = name;
+        if (kind != FrameKind.WS_GAINERS && kind != FrameKind.WS_LOSERS) {
+            throw new IllegalArgumentException("Not a WebSocket frame kind: " + kind);
+        }
+        this.kind = kind;
         this.wsUrl = wsUrl;
         this.pingInterval = pingInterval;
         this.tossClient = tossClient;
@@ -74,23 +77,23 @@ public class TossMarketStream {
         if (current != null) {
             current.dispose();   // cancelling the subscription closes the WebSocket
         }
-        log.info("{} stopped", name);
+        log.info("{} stopped", kind);
     }
 
     /** Replaces the whole subscription list. Toss declarations are full-replace, never add/remove. */
     public synchronized void updateSubscriptions(List<String> codes) {
         if (codes.size() * 2 > MAX_TOPICS) {
             throw new IllegalArgumentException(
-                    name + ": " + codes.size() + " stocks x 2 channels exceeds " + MAX_TOPICS + " topics");
+                    kind + ": " + codes.size() + " stocks x 2 channels exceeds " + MAX_TOPICS + " topics");
         }
         String quoted = codes.stream().map(code -> "\"" + code + "\"").collect(Collectors.joining(","));
         String declaration = codes.isEmpty() ? "[]"
-                : "[{\"id\":\"" + name + "-" + (++declarationCount) + "\"},"
+                : "[{\"id\":\"" + kind + "-" + (++declarationCount) + "\"},"
                 + "{\"type\":\"trade:kr\",\"codes\":[" + quoted + "]},"
                 + "{\"type\":\"orderbook:kr\",\"codes\":[" + quoted + "]}]";
 
         declarations.tryEmitNext(declaration).orThrow();
-        log.info("{} subscriptions updated: {} stocks", name, codes.size());
+        log.info("{} subscriptions updated: {} stocks", kind, codes.size());
     }
 
     /** Test hook: drop the current connection as if the network failed. */
@@ -123,7 +126,7 @@ public class TossMarketStream {
         long base = Math.min(MAX_BACKOFF_MS, FIRST_BACKOFF_MS << Math.min(failedAttempts - 1, 10));
         long delayMs = base + ThreadLocalRandom.current().nextLong(base / 2 + 1);   // jitter spreads out reconnects
 
-        log.warn("{} {}, reconnecting in {} ms (attempt {})", name, reason, delayMs, failedAttempts);
+        log.warn("{} {}, reconnecting in {} ms (attempt {})", kind, reason, delayMs, failedAttempts);
         connect(delayMs);
     }
 
@@ -134,21 +137,21 @@ public class TossMarketStream {
         return client.execute(wsUrl, headers, ws -> {
             session = ws;
             connectedAtNanos = System.nanoTime();
-            log.info("{} connected", name);
+            log.info("{} connected", kind);
 
             // Latest subscription list (replayed on every reconnect) + a text PING to keep the connection alive
             Flux<WebSocketMessage> outgoing = Flux.merge(
                             declarations.asFlux(),
-                            Flux.interval(pingInterval).map(tick -> "PING")
-                    )
+                            Flux.interval(pingInterval).map(tick -> "PING"))
                     .map(ws::textMessage);
 
             Mono<Void> incoming = ws.receive()
                     .doOnNext(message -> {
+                        Instant receivedAt = Instant.now();   // stamp first, before any other work
                         String raw = message.getPayloadAsText();
-                        frameBus.publish(name, Instant.now(), raw);
+                        frameBus.publish(kind, receivedAt, raw);
                         if (!raw.startsWith("{\"type\":\"message\"")) {
-                            log.info("{} control frame: {}", name, raw);   // ack, pong, error
+                            log.info("{} control frame: {}", kind, raw);   // ack, pong, error
                         }
                     })
                     .then();

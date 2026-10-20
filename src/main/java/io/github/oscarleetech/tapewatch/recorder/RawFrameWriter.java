@@ -25,13 +25,18 @@ import static java.nio.file.StandardOpenOption.WRITE;
 /**
  * FrameBus handler that records every frame to one gzip file per Korea-time day,
  * named by when the file was opened: {@code data/raw/2026-10-08_085512.tsv.gz}.
- * Each line is tab separated: seq, receivedAt (UTC), connection, raw frame.
+ *
+ * The first line is the format header {@value #FORMAT_HEADER}. Every other line is tab separated:
+ * seq, receivedAt (UTC), kind, raw frame. Readers skip lines that start with '#'
+ * and split with a limit of 4 columns, so the raw frame may contain tabs.
  *
  * A restart always opens a new file instead of appending. After a crash the old file ends with
  * a cut-off gzip block, and anything appended behind it could not be read back.
  */
 @Component
 public class RawFrameWriter implements EventHandler<FrameEvent> {
+
+    public static final String FORMAT_HEADER = "#tapewatch-raw v1";
 
     private static final Logger log = LoggerFactory.getLogger(RawFrameWriter.class);
     private static final ZoneId SEOUL = ZoneId.of("Asia/Seoul");
@@ -63,13 +68,15 @@ public class RawFrameWriter implements EventHandler<FrameEvent> {
             Path path = rawDir.resolve(kst.format(FILE_NAME) + ".tsv.gz");
             current = new OutputStreamWriter(new GZIPOutputStream(
                     new BufferedOutputStream(Files.newOutputStream(path, CREATE_NEW, WRITE)), true), UTF_8);
+            current.write(FORMAT_HEADER + "\n");
             currentPath = path;
             currentDay = kst.toLocalDate();
             log.info("Recording raw frames to {}", path.toAbsolutePath());
         }
 
-        current.write(frame.seq() + "\t" + frame.receivedAt() + "\t" + frame.connection() + "\t"
-                + frame.raw().replace('\n', ' ') + "\n");
+        // A literal CR or LF cannot appear inside a JSON string, so turning them into spaces loses nothing
+        current.write(frame.seq() + "\t" + frame.receivedAt() + "\t" + frame.kind().name() + "\t"
+                + frame.raw().replace('\r', ' ').replace('\n', ' ') + "\n");
         framesInFile++;
 
         // Busy market: flush at the end of a batch, at most once per second

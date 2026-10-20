@@ -25,33 +25,36 @@ class RawFrameWriterTest {
     Path dir;
 
     @Test
-    void writesTheWholeDayToOneFile() throws IOException {
+    void writesTheWholeDayToOneFileAfterTheFormatHeader() throws IOException {
         RawFrameWriter writer = new RawFrameWriter(dir);
-        writer.onEvent(event(0, at(9, 0, 1), "GAINERS", "morning"), 0, true);
-        writer.onEvent(event(1, at(15, 19, 59), "LOSERS", "afternoon"), 1, true);
+        writer.onEvent(event(0, at(9, 0, 1), FrameKind.WS_GAINERS, "morning"), 0, true);
+        writer.onEvent(event(1, at(15, 19, 59), FrameKind.WS_LOSERS, "afternoon"), 1, true);
         writer.onShutdown();
 
         assertThat(readLines(dir.resolve("2026-10-08_090001.tsv.gz"))).containsExactly(
-                "0\t" + at(9, 0, 1) + "\tGAINERS\tmorning",
-                "1\t" + at(15, 19, 59) + "\tLOSERS\tafternoon");
+                RawFrameWriter.FORMAT_HEADER,
+                "0\t" + at(9, 0, 1) + "\tWS_GAINERS\tmorning",
+                "1\t" + at(15, 19, 59) + "\tWS_LOSERS\tafternoon");
     }
 
     @Test
     void crashThenRestartLosesOnlyUnflushedFrames() throws IOException {
         RawFrameWriter crashed = new RawFrameWriter(dir);
-        crashed.onEvent(event(0, at(9, 10, 0), "GAINERS", "flushed"), 0, false);
+        crashed.onEvent(event(0, at(9, 10, 0), FrameKind.WS_GAINERS, "flushed"), 0, false);
         crashed.onTimeout(0);                                                     // the market went quiet
-        crashed.onEvent(event(1, at(9, 10, 1), "GAINERS", "not-flushed"), 1, false);
+        crashed.onEvent(event(1, at(9, 10, 1), FrameKind.WS_GAINERS, "not-flushed"), 1, false);
         // no onShutdown(): this is what a crash looks like
 
         RawFrameWriter restarted = new RawFrameWriter(dir);
-        restarted.onEvent(event(0, at(11, 20, 0), "GAINERS", "after-restart"), 0, true);
+        restarted.onEvent(event(0, at(11, 20, 0), FrameKind.WS_GAINERS, "after-restart"), 0, true);
         restarted.onShutdown();
 
         assertThat(readLines(dir.resolve("2026-10-08_091000.tsv.gz")))
+                .filteredOn(line -> !line.startsWith("#"))
                 .extracting(line -> line.split("\t")[3])
                 .containsExactly("flushed");
         assertThat(readLines(dir.resolve("2026-10-08_112000.tsv.gz")))
+                .filteredOn(line -> !line.startsWith("#"))
                 .extracting(line -> line.split("\t")[3])
                 .containsExactly("after-restart");
     }
@@ -59,9 +62,9 @@ class RawFrameWriterTest {
     @Test
     void recordsFramesPublishedThroughTheBus() throws IOException {
         FrameBus bus = new FrameBus(1 << 10, List.of(new RawFrameWriter(dir)));
-        bus.publish("GAINERS", Instant.now(), "first");
-        bus.publish("LOSERS", Instant.now(), "second");
-        bus.publish("GAINERS", Instant.now(), "third");
+        bus.publish(FrameKind.WS_GAINERS, Instant.now(), "first");
+        bus.publish(FrameKind.WS_LOSERS, Instant.now(), "second");
+        bus.publish(FrameKind.REST_CANDLES_1M, Instant.now(), "{\"body\":\r\n\"third\"}");
         bus.shutdown();   // drains the ring, then the writer closes its file in onShutdown
 
         List<Path> files;
@@ -70,13 +73,17 @@ class RawFrameWriterTest {
         }
         assertThat(files).hasSize(1);
         assertThat(readLines(files.getFirst()))
+                .filteredOn(line -> !line.startsWith("#"))
                 .extracting(line -> line.split("\t")[0] + " " + line.split("\t")[2] + " " + line.split("\t")[3])
-                .containsExactly("0 GAINERS first", "1 LOSERS second", "2 GAINERS third");
+                .containsExactly(
+                        "0 WS_GAINERS first",
+                        "1 WS_LOSERS second",
+                        "2 REST_CANDLES_1M {\"body\":  \"third\"}");   // CR and LF became spaces, still one line
     }
 
-    private static FrameEvent event(long seq, Instant receivedAt, String connection, String raw) {
+    private static FrameEvent event(long seq, Instant receivedAt, FrameKind kind, String raw) {
         FrameEvent event = new FrameEvent();
-        event.set(new RawFrame(seq, receivedAt, connection, raw));
+        event.set(new RawFrame(seq, receivedAt, kind, raw));
         return event;
     }
 

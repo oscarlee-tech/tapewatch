@@ -18,8 +18,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * Fans out every WebSocket frame to every handler through one Disruptor ring.
- * A frame is either seen by all handlers or by none, so the recording and the live pipeline
+ * Fans out every frame to every handler through one Disruptor ring.
+ * A frame is either seen by all handlers or by none, so the recording and the row builder
  * always see the same frames in the same order.
  * Any Spring bean that implements {@code EventHandler<FrameEvent>} is subscribed automatically.
  */
@@ -38,7 +38,7 @@ public class FrameBus {
                 FrameEvent::new,
                 ringSize,                                                  // must be a power of 2
                 Thread.ofPlatform().daemon(true).name("frame-bus-", 0).factory(),
-                ProducerType.MULTI,                                        // two WebSocket connections publish
+                ProducerType.MULTI,                                        // WebSocket and REST threads publish
                 new TimeoutBlockingWaitStrategy(1, TimeUnit.SECONDS));     // idle handlers get onTimeout every 1s
 
         // The default handler stops the handler thread on the first exception. Log and keep going instead.
@@ -65,13 +65,13 @@ public class FrameBus {
     }
 
     /**
-     * Called from WebSocket threads. Never blocks: if the ring is full the frame is dropped and counted.
-     * The ring sequence becomes the frame's seq, so seq is global across both connections.
+     * Called from WebSocket and REST threads. Never blocks: if the ring is full the frame is dropped and counted.
+     * The ring sequence becomes the frame's seq, so seq is global across every source.
      */
-    public boolean publish(String connection, Instant receivedAt, String raw) {
+    public boolean publish(FrameKind kind, Instant receivedAt, String raw) {
         boolean published = disruptor.getRingBuffer().tryPublishEvent(
-                (event, sequence, conn, time, text) -> event.set(new RawFrame(sequence, time, conn, text)),
-                connection, receivedAt, raw);
+                (event, sequence, frameKind, time, text) -> event.set(new RawFrame(sequence, time, frameKind, text)),
+                kind, receivedAt, raw);
 
         if (!published) {
             long total = dropped.incrementAndGet();

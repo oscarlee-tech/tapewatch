@@ -51,7 +51,7 @@ class TossMarketStreamIntegrationTest {
         List<RawFrame> frames = new CopyOnWriteArrayList<>();
         FrameBus bus = new FrameBus(1 << 12, List.of((event, sequence, endOfBatch) -> frames.add(event.frame())));
         TossMarketStream stream = new TossMarketStream(
-                "TEST", URI.create(wsUrl), Duration.ofSeconds(2), tossClient, bus);   // fast PING for the test
+                FrameKind.WS_GAINERS, URI.create(wsUrl), Duration.ofSeconds(2), tossClient, bus);   // fast PING
 
         try {
             stream.updateSubscriptions(List.of("005930"));
@@ -72,7 +72,8 @@ class TossMarketStreamIntegrationTest {
 
         assertThat(frames).filteredOn(ack)
                 .extracting(RawFrame::raw)
-                .allSatisfy(raw -> assertThat(raw).contains("trade:kr:005930", "orderbook:kr:005930", "\"rejected\":[]"));
-        assertThat(frames).extracting(RawFrame::connection).containsOnly("TEST");
+                .allSatisfy(raw -> assertThat(raw).contains(
+                        "\"id\":\"WS_GAINERS-1\"", "trade:kr:005930", "orderbook:kr:005930", "\"rejected\":[]"));
+        assertThat(frames).extracting(RawFrame::kind).containsOnly(FrameKind.WS_GAINERS);
     }
 }
